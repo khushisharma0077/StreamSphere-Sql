@@ -61,40 +61,7 @@ WHERE table_schema = 'public'
   AND table_name IN ('users', 'content', 'subscriptions', 'viewing_history', 'ratings', 'payments')
 ORDER BY table_name;
 
--- Optional table previews
-SELECT * FROM users ORDER BY user_id;
-SELECT * FROM content ORDER BY content_id;
-SELECT * FROM subscriptions ORDER BY subscription_id;
-SELECT * FROM viewing_history ORDER BY view_id;
-SELECT * FROM ratings ORDER BY rating_id;
-SELECT * FROM payments ORDER BY payment_id;
-
--- Record counts before cleaning
-SELECT 'Users' AS table_name, COUNT(*) AS total_records FROM users
-UNION ALL SELECT 'Content', COUNT(*) FROM content
-UNION ALL SELECT 'Subscriptions', COUNT(*) FROM subscriptions
-UNION ALL SELECT 'Viewing History', COUNT(*) FROM viewing_history
-UNION ALL SELECT 'Ratings', COUNT(*) FROM ratings
-UNION ALL SELECT 'Payments', COUNT(*) FROM payments
-ORDER BY table_name;
-
--- 4. DATA QUALITY CHECKS BEFORE CLEANING
-SELECT * FROM users WHERE city IS NULL OR TRIM(city) = '';
-
-SELECT content_id, title, genre
-FROM content
-WHERE genre IS NULL OR TRIM(genre) = ''
-   OR genre <> TRIM(genre)
-   OR genre <> INITCAP(TRIM(genre));
-
-SELECT user_id, COUNT(*) AS duplicate_count FROM users GROUP BY user_id HAVING COUNT(*) > 1;
-SELECT content_id, COUNT(*) AS duplicate_count FROM content GROUP BY content_id HAVING COUNT(*) > 1;
-SELECT subscription_id, COUNT(*) AS duplicate_count FROM subscriptions GROUP BY subscription_id HAVING COUNT(*) > 1;
-SELECT view_id, COUNT(*) AS duplicate_count FROM viewing_history GROUP BY view_id HAVING COUNT(*) > 1;
-SELECT rating_id, COUNT(*) AS duplicate_count FROM ratings GROUP BY rating_id HAVING COUNT(*) > 1;
-SELECT payment_id, COUNT(*) AS duplicate_count FROM payments GROUP BY payment_id HAVING COUNT(*) > 1;
-
--- 5. DATA CLEANING (safe to rerun)
+-- 3. DATA CLEANING (safe to rerun)
 UPDATE users
 SET city = 'Unknown'
 WHERE city IS NULL OR TRIM(city) = '';
@@ -104,26 +71,9 @@ SET genre = INITCAP(TRIM(genre))
 WHERE genre IS NOT NULL
   AND genre <> INITCAP(TRIM(genre));
 
--- 6. VERIFY CLEANING
 SELECT * FROM users WHERE city IS NULL OR TRIM(city) = '';
 
--- NULL genres are reported for review; formatting issues should be absent.
-SELECT content_id, title, genre
-FROM content
-WHERE genre IS NULL OR TRIM(genre) = ''
-   OR genre <> TRIM(genre)
-   OR genre <> INITCAP(TRIM(genre));
-
--- Record counts after cleaning
-SELECT 'Users' AS table_name, COUNT(*) AS total_records FROM users
-UNION ALL SELECT 'Content', COUNT(*) FROM content
-UNION ALL SELECT 'Subscriptions', COUNT(*) FROM subscriptions
-UNION ALL SELECT 'Viewing History', COUNT(*) FROM viewing_history
-UNION ALL SELECT 'Ratings', COUNT(*) FROM ratings
-UNION ALL SELECT 'Payments', COUNT(*) FROM payments
-ORDER BY table_name;
-
--- 7. ANALYSIS QUERIES
+-- 4. ANALYSIS QUERIES
 
 -- QUERY 1: Top 10 most-watched content
 SELECT c.content_id, c.title, c.content_type, c.genre,
@@ -194,21 +144,6 @@ FROM (
     GROUP BY user_id
 ) AS user_activity
 ORDER BY total_watch_minutes DESC;
-
--- Optional: Number of users in each engagement category
-SELECT CASE
-           WHEN total_watch_minutes >= 500 THEN 'High'
-           WHEN total_watch_minutes >= 200 THEN 'Medium'
-           ELSE 'Low'
-       END AS engagement_level,
-       COUNT(*) AS total_users
-FROM (
-    SELECT user_id, SUM(watch_minutes) AS total_watch_minutes
-    FROM viewing_history
-    GROUP BY user_id
-) AS user_activity
-GROUP BY engagement_level
-ORDER BY total_users DESC;
 
 -- QUERY 8: Rank content within each genre
 SELECT genre, title, total_watch_minutes,
